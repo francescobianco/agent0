@@ -1,6 +1,10 @@
 import os
 import openai
 
+from openai import OpenAI
+
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
 def read_self():
     with open(__file__, 'r') as f:
         return f.read()
@@ -10,16 +14,14 @@ def write_self(content):
         f.write(content)
 
 def main():
-    openai.api_key = os.environ['OPENAI_API_KEY']
-
     current_code = read_self()
     user_input = input("What modification would you like? ")
 
     if not user_input.strip():
         return
 
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+    response = client.chat.completions.create(
+        model="gpt-4o",  # puoi cambiare con gpt-4-turbo o gpt-3.5-turbo se preferisci
         messages=[
             {"role": "system", "content": "You are a code modification assistant. Modify the given Python code based on user request. Return ONLY the complete modified code without explanations. Preserve the core self-modifying functionality and structure."},
             {"role": "user", "content": f"Current code:\n{current_code}\n\nModification request: {user_input}\n\nReturn the complete modified code:"}
