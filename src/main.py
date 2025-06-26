@@ -1,43 +1,43 @@
 import os
-
 from openai import OpenAI
 
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-def read_self():
-    with open(__file__, 'r') as f:
-        return f.read()
+with open(__file__, 'r') as f:
+    current_code = f.read()
 
-def write_self(content):
-    with open(__file__, 'w') as f:
-        f.write(content)
+user_input = input("Enter modification request: ")
 
-def main():
-    current_code = read_self()
-    user_input = input("Quale modifica desideri? ")
+prompt = f"""You are modifying a self-modifying Python file. The file must retain its core functionality:
+1. Read its own source code
+2. Get user input for modifications
+3. Use OpenAI API to modify itself
+4. Save the modifications
+5. Exit for next iteration
 
-    if not user_input.strip():
-        return
+CRITICAL: The modified code MUST still be a self-modifying file with the same core logic and functionality. Do not remove or break the self-modification mechanism.
 
-    response = client.chat.completions.create(
-        model="gpt-4o",  # puoi cambiare con gpt-4-turbo o gpt-3.5-turbo se preferisci
-        messages=[
-            {"role": "system", "content": "Sei un assistente per la modifica del codice. Modifica il codice Python fornito in base alla richiesta dell'utente. Restituisci SOLO il codice completo modificato senza spiegazioni. Preserva la funzionalità e la struttura di auto-modifica del codice."},
-            {"role": "user", "content": f"Codice attuale:\n{current_code}\n\nRichiesta di modifica: {user_input}\n\nRestituisci il codice completo modificato:"}
-        ],
-        temperature=0.1
-    )
+Current code:
+{current_code}
 
-    modified_code = response.choices[0].message.content.strip()
+User request: {user_input}
 
-    if modified_code.startswith('```python'):
-        modified_code = modified_code[9:]
-    if modified_code.startswith('```'):
-        modified_code = modified_code[3:]
-    if modified_code.endswith('```'):
-        modified_code = modified_code[:-3]
+Return ONLY the complete modified Python code that maintains self-modification capability:"""
 
-    write_self(modified_code.strip())
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": prompt}],
+    temperature=0.3
+)
 
-if __name__ == "__main__":
-    main()
+new_code = response.choices[0].message.content.strip()
+
+if new_code.startswith("```python"):
+    new_code = new_code[9:]
+if new_code.endswith("```"):
+    new_code = new_code[:-3]
+
+with open(__file__, 'w') as f:
+    f.write(new_code.strip())
+
+print("File modified successfully")
