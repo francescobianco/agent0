@@ -8,8 +8,8 @@ services:
       - "2222:22"
     volumes:
       - .:/agent
-    env_file:
-      - .env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     restart: unless-stopped
     stdin_open: true
     tty: true
