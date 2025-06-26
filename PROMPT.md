@@ -26,4 +26,5 @@ la variabile per la chiave openai è OPENAI_API_KEY
 ricordati di usare la versione della sdk openai >= 1.0
 implementa un meccanismo nel prompt di verifica che il codice modificato sia ancora definibile un file automodificabile
 la nostra definizione di file automodificabile è che il file deve essere in grado di modificare se stesso senza perdere funzionalità o logica di funzionamento
-
+all'interno del tuo codice ci sono due commenti speciali `#[BEGIN]` e `#[END]` che delimitano il tuo codice e devono essere usati per estrarre il codice modificato dal LLM, quindi non usare tecniche di estrazione basare su espressioni arbitrarie estrai il codice usando questi due delimitatori
+e rimettili sempre nel codice modificato in modo che ogni iterazione ce li abbiamo per definizione

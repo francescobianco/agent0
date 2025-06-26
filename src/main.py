@@ -1,43 +1,52 @@
+#[BEGIN]
 import os
+import sys
 from openai import OpenAI
 
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+def main():
+    client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
-with open(__file__, 'r') as f:
-    current_code = f.read()
+    with open(__file__, 'r') as f:
+        current_code = f.read()
 
-user_input = input("Enter modification request: ")
+    user_input = input("Enter your request: ")
 
-prompt = f"""You are modifying a self-modifying Python file. The file must retain its core functionality:
-1. Read its own source code
-2. Get user input for modifications
-3. Use OpenAI API to modify itself
-4. Save the modifications
-5. Exit for next iteration
+    prompt = f"""You are a code modification assistant. Your task is to modify the following Python code based on the user's request while preserving its self-modifying functionality.
 
-CRITICAL: The modified code MUST still be a self-modifying file with the same core logic and functionality. Do not remove or break the self-modification mechanism.
+CRITICAL RULES:
+1. The code must remain a self-modifying file that can iterate and improve itself
+2. Do not remove or change the core logic of reading itself, prompting user, calling OpenAI, and saving modifications
+3. Keep the #[BEGIN] and #[END] delimiters intact and in the same positions
+4. The modified code must still be able to modify itself in future iterations
+5. Only modify what's necessary to fulfill the user's request
+6. Maintain the compact and minimal structure
 
 Current code:
 {current_code}
 
 User request: {user_input}
 
-Return ONLY the complete modified Python code that maintains self-modification capability:"""
+Return ONLY the modified code between #[BEGIN] and #[END] delimiters, including these delimiters."""
 
-response = client.chat.completions.create(
-    model="gpt-4",
-    messages=[{"role": "user", "content": prompt}],
-    temperature=0.3
-)
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3
+    )
 
-new_code = response.choices[0].message.content.strip()
+    modified_code = response.choices[0].message.content
 
-if new_code.startswith("```python"):
-    new_code = new_code[9:]
-if new_code.endswith("```"):
-    new_code = new_code[:-3]
+    begin_marker = "#[BEGIN]"
+    end_marker = "#[END]"
 
-with open(__file__, 'w') as f:
-    f.write(new_code.strip())
+    if begin_marker in modified_code and end_marker in modified_code:
+        start_idx = modified_code.find(begin_marker)
+        end_idx = modified_code.find(end_marker) + len(end_marker)
+        extracted_code = modified_code[start_idx:end_idx]
 
-print("File modified successfully")
+        with open(__file__, 'w') as f:
+            f.write(extracted_code)
+
+if __name__ == "__main__":
+    main()
+#[END]

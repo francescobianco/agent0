@@ -1,0 +1,1 @@
+aggiungi dei commenti al tuo codice -p password ssh -t -o StrictHostKeyChecking=no root@localhost -p 2222

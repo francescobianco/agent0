@@ -1,4 +1,7 @@
 
+clean:
+	@rm -fr hashes.txt
+
 push:
 	@git add .
 	@git commit -am "New release!" || true
