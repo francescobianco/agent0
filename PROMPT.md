@@ -23,3 +23,4 @@ non preoccuparti di come interromere il flusso,
 l'unico obbiettivo e scrivere il miglior codice compatto e automodificante possibile
 assicurati che il prompt non corrompa il file e non lo deturpi di sue parti, non deve essere persa funzionalita o cambiata la logica di funzionamento
 la variabile per la chiave openai è OPENAI_API_KEY
+ricordati di usare la versione della sdk openai >= 1.0
