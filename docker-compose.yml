@@ -1,0 +1,23 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  adaptive-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: adaptive-software
+    ports:
+      - "2323:2323"
+    volumes:
+      # Monta la directory corrente in /agent
+      - .:/agent
+      # Volume persistente per lo stato
+      - ./state:/agent/state
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - AGENT_PORT=2323
+      - PYTHONPATH=/agent/src
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
