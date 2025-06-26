@@ -28,3 +28,6 @@ implementa un meccanismo nel prompt di verifica che il codice modificato sia anc
 la nostra definizione di file automodificabile è che il file deve essere in grado di modificare se stesso senza perdere funzionalità o logica di funzionamento
 all'interno del tuo codice ci sono due commenti speciali `#[BEGIN]` e `#[END]` che delimitano il tuo codice e devono essere usati per estrarre il codice modificato dal LLM, quindi non usare tecniche di estrazione basare su espressioni arbitrarie estrai il codice usando questi due delimitatori
 e rimettili sempre nel codice modificato in modo che ogni iterazione ce li abbiamo per definizione
+ricorda che il tuo codice va dal primo dei `#[BEGIN]` all'ultimo dei `#[END]` in fatti nel mezzo del tuo codice ci posso essere altri `#[BEGIN]` e `#[END]` che determinano la logica di interpretazione stessa, quindi per salvaguarda tu estrai il codice dal llm tra il primo `#[BEGIN]` e l'ultimo `#[END]`
+
+```python
