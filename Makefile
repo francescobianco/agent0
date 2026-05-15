@@ -82,3 +82,8 @@ clean:
 	@rm -fr $(AGENT).d
 	@rm -f $(TEST_AGENT)
 	@rm -fr $(TEST_AGENT).d
+
+push:
+	@git add .
+	@git commit -am "update" || true
+	@git push
