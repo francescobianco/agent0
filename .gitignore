@@ -1,34 +1,8 @@
 
-# .dockerignore
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git
-.mypy_cache
-.pytest_cache
-.hypothesis
 .env
-
-# Docker
-.dockerignore
-Dockerfile
-docker-compose*.yml
+agent0.sh.d/
+*.sh.d/
+*.log
 
 # IDE
 .vscode/
@@ -45,12 +19,6 @@ docker-compose*.yml
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# Backup files
-*.backup_*
-backups/
-
-# Temporary files
 tmp/
 temp/
 *.tmp

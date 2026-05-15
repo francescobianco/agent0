@@ -1,84 +1,36 @@
-# README.md
-# 🤖 Software Auto-Adattivo Containerizzato
+# agent0
 
-Software intelligente che può modificare il proprio codice attraverso interazioni telnet, completamente containerizzato con Docker.
+`agent0` e' un esperimento di agente automodificante in un singolo file `sh` POSIX.
 
-## 🚀 Quick Start
+La copia nella repo e' ibernata. `make start` la copia in `/tmp/agent0.sh` e la avvia dentro una vera TTY gestita da `tmux`.
 
-```bash
-# 1. Clona e entra nella directory
-git clone <repo> && cd <repo>
+## Uso
 
-# 2. Crea il file .env
-cp .env.example .env
-# Modifica .env con la tua OPENAI_API_KEY
-
-# 3. Avvia il software
-make run
-
-# 4. Connettiti al server
+```sh
+make start
 make connect
 ```
 
-## 📁 Struttura del Progetto
+Alla prima partenza, se non ha una chiave incorporata, entra in avvio latente: resta vivo e chiede la API key sul suo terminale. La chiave viene salvata dentro `/tmp/agent0.sh`, quindi l'agente vivo se la porta dietro quando migra.
 
-```
-/agent/
-├── src/
-│   └── main.py                 # Codice principale
-├── state/                      # Stato persistente  
-├── backups/                    # Backup automatici
-├── Dockerfile                  # Immagine Docker
-├── docker-compose.yml          # Orchestrazione
-├── Makefile                    # Comandi utili
-├── requirements.txt            # Dipendenze Python
-└── .env                        # Configurazione
+Per fermarlo:
+
+```sh
+make stop
 ```
 
-## 🔧 Comandi Principali
+Per validare la copia ibernata:
 
-```bash
-make help        # Mostra tutti i comandi
-make build       # Costruisce l'immagine
-make run         # Avvia il container
-make connect     # Connetti via telnet
-make logs        # Mostra i logs
-make stop        # Ferma il container
-make clean       # Pulizia completa
+```sh
+make check
 ```
 
-## 📞 Connessione
+## Terminale
 
-```bash
-# Metodo 1: Make command
-make connect
+La connessione e' esterna all'agente:
 
-# Metodo 2: Telnet diretto  
-telnet localhost 2323
-
-# Metodo 3: Netcat
-nc localhost 2323
+```sh
+tmux attach-session -t agent0
 ```
 
-## 🎯 Esempi di Utilizzo
-
-Una volta connesso:
-```
-🤖 memorizza gli ultimi campioni di scacchi
-🤖 aggiungi una funzione per calcolare fibonacci
-🤖 /info
-🤖 /help
-```
-
-## 🛠️ Sviluppo
-
-```bash
-# Modalità sviluppo (con logs in tempo reale)
-make dev
-
-# Ricostruzione completa
-make rebuild
-
-# Test rapido
-make quick-test
-```
+Non ci sono argomenti o sottocomandi CLI per `agent0.sh`: quando viene chiamato parte e basta.
