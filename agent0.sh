@@ -17,6 +17,8 @@ self_path() {
 
 SELF=$(self_path)
 SPACE=$SELF.d
+INPUT=$SPACE/in
+READ_POS=1
 
 say() {
     printf '%s\n' "$*"
@@ -33,10 +35,26 @@ need() {
 
 space() {
     mkdir -p "$SPACE/backups" || die "cannot create $SPACE"
+    [ -f "$INPUT" ] || : > "$INPUT" || die "cannot create $INPUT"
 }
 
 active() {
     [ -n "$AGENT0_EMBEDDED_API_KEY" ]
+}
+
+read_line() {
+    while :; do
+        total=$(wc -l < "$INPUT" | tr -d ' ')
+        case "$total" in
+            ''|*[!0-9]*) total=0 ;;
+        esac
+        if [ "$total" -ge "$READ_POS" ]; then
+            AGENT0_LINE=$(sed -n "${READ_POS}p" "$INPUT")
+            READ_POS=$((READ_POS + 1))
+            return 0
+        fi
+        sleep 1
+    done
 }
 
 json_escape() {
@@ -117,16 +135,8 @@ save_key() {
 ask_key() {
     say "agent0 is latent: alive, waiting for an OpenAI API key."
     printf 'api key> '
-    if command -v stty >/dev/null 2>&1; then
-        old=$(stty -g 2>/dev/null || :)
-        stty -echo 2>/dev/null || :
-        IFS= read -r key
-        [ -n "$old" ] && stty "$old" 2>/dev/null || :
-        printf '\n'
-    else
-        IFS= read -r key
-    fi
-    save_key "$key"
+    read_line || exit 0
+    save_key "$AGENT0_LINE"
     exec "$SELF"
 }
 
@@ -138,7 +148,7 @@ Non-negotiable rules:
 - Return only the updated script body between $AGENT0_BEGIN and $AGENT0_END.
 - The file must stay POSIX sh and must run when called with no arguments.
 - Do not add CLI arguments, subcommands, environment-variable configuration, Python, or Docker assumptions.
-- Preserve latent startup: without an embedded API key, the agent remains alive and asks for the key on its TTY.
+- Preserve latent startup: without an embedded API key, the agent remains alive in background and asks for the key through its FIFO terminal.
 - Preserve self-modification, key carry-over, migration ability when requested in natural language, and syntax validation.
 - The updated script must pass sh -n.
 
@@ -232,11 +242,13 @@ main() {
     active || ask_key
 
     say "agent0 alive: $SELF"
-    say "write a request; Ctrl-C closes this terminal, the tmux session can keep it alive."
+    say "terminal input: $INPUT"
+    say "write a request into the terminal; the agent stays alive in background."
 
     while :; do
         printf 'agent0> '
-        IFS= read -r line || exit 0
+        read_line || exit 0
+        line=$AGENT0_LINE
         [ -n "$line" ] || continue
         migrate_if_requested "$line" && continue
         rewrite_self "$line"

@@ -1,23 +1,44 @@
 AGENT=/tmp/agent0.sh
-SESSION=agent0
+SPACE=$(AGENT).d
+PID=$(SPACE)/pid
+IN=$(SPACE)/in
+OUT=$(SPACE)/out
 
 .PHONY: start connect status stop check clean
 
 start:
 	@cp agent0.sh $(AGENT)
 	@chmod +x $(AGENT)
-	@tmux has-session -t $(SESSION) 2>/dev/null && tmux kill-session -t $(SESSION) || true
-	@tmux new-session -d -s $(SESSION) $(AGENT)
-	@tmux display-message -p 'agent0 started in tmux session: $(SESSION)'
+	@rm -fr $(SPACE)
+	@mkdir -p $(SPACE)
+	@: > $(IN)
+	@: > $(OUT)
+	@if test -f $(PID) && kill -0 `cat $(PID)` 2>/dev/null; then \
+		printf '%s\n' "agent0 already running: `cat $(PID)`"; \
+	else \
+		nohup $(AGENT) > $(OUT) 2>&1 & echo $$! > $(PID); \
+		printf '%s\n' "agent0 started: `cat $(PID)`"; \
+		printf '%s\n' "connect with: make connect"; \
+	fi
 
 connect:
-	@tmux attach-session -t $(SESSION)
+	@test -f $(IN) || { printf '%s\n' 'agent0 terminal not ready; run make start'; exit 1; }
+	@touch $(OUT)
+	@(tail -n +1 -f $(OUT) & echo $$! > $(SPACE)/tail.pid; \
+	trap 'kill `cat $(SPACE)/tail.pid` 2>/dev/null || true' INT TERM EXIT; \
+	while IFS= read -r line; do printf '%s\n' "$$line" >> $(IN); done)
 
 status:
-	@tmux has-session -t $(SESSION) 2>/dev/null && tmux list-sessions | sed -n '/^$(SESSION):/p' || printf '%s\n' 'agent0 stopped'
+	@if test -f $(PID) && kill -0 `cat $(PID)` 2>/dev/null; then \
+		printf '%s\n' "agent0 running: `cat $(PID)`"; \
+	else \
+		printf '%s\n' 'agent0 stopped'; \
+	fi
 
 stop:
-	@tmux has-session -t $(SESSION) 2>/dev/null && tmux kill-session -t $(SESSION) || true
+	@if test -f $(PID); then kill `cat $(PID)` 2>/dev/null || true; fi
+	@if test -f $(SPACE)/tail.pid; then kill `cat $(SPACE)/tail.pid` 2>/dev/null || true; fi
+	@rm -f $(PID) $(SPACE)/tail.pid
 
 check:
 	@sh -n agent0.sh

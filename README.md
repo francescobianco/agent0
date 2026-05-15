@@ -2,7 +2,7 @@
 
 `agent0` e' un esperimento di agente automodificante in un singolo file `sh` POSIX.
 
-La copia nella repo e' ibernata. `make start` la copia in `/tmp/agent0.sh` e la avvia dentro una vera TTY gestita da `tmux`.
+La copia nella repo e' ibernata. `make start` la copia in `/tmp/agent0.sh` e la avvia in background. Da Make usa `nohup /tmp/agent0.sh &` per non far morire il processo quando termina la shell del target; l'agente resta comunque un normale script lanciato in background.
 
 ## Uso
 
@@ -11,7 +11,7 @@ make start
 make connect
 ```
 
-Alla prima partenza, se non ha una chiave incorporata, entra in avvio latente: resta vivo e chiede la API key sul suo terminale. La chiave viene salvata dentro `/tmp/agent0.sh`, quindi l'agente vivo se la porta dietro quando migra.
+Alla prima partenza, se non ha una chiave incorporata, entra in avvio latente: resta vivo in background e chiede la API key attraverso il terminale FIFO in `/tmp/agent0.sh.d/`. La chiave viene salvata dentro `/tmp/agent0.sh`, quindi l'agente vivo se la porta dietro quando migra.
 
 Per fermarlo:
 
@@ -30,7 +30,7 @@ make check
 La connessione e' esterna all'agente:
 
 ```sh
-tmux attach-session -t agent0
+make connect
 ```
 
 Non ci sono argomenti o sottocomandi CLI per `agent0.sh`: quando viene chiamato parte e basta.
