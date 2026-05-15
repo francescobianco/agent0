@@ -248,6 +248,7 @@ main() {
         line=$AGENT0_LINE
         [ -n "$line" ] || continue
         migrate_if_requested "$line" && continue
+        say '...'
         rewrite_self "$line"
     done
 }
