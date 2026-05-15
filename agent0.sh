@@ -216,22 +216,6 @@ rewrite_self() {
     exec "$SELF"
 }
 
-migrate_if_requested() {
-    line=$1
-    case "$line" in
-        migra\ in\ *|migrati\ in\ *|spostati\ in\ *)
-            target=${line#* in }
-            [ -n "$target" ] || return 1
-            mkdir -p "$target" || die "cannot create $target"
-            cp "$SELF" "$target/agent0.sh" || die "migration copy failed"
-            chmod +x "$target/agent0.sh" 2>/dev/null || :
-            say "migrated to $target/agent0.sh"
-            return 0
-            ;;
-    esac
-    return 1
-}
-
 main() {
     setup
     exec 3<>"$IN_FIFO" 2>/dev/null
@@ -247,7 +231,6 @@ main() {
         read_line || exit 0
         line=$AGENT0_LINE
         [ -n "$line" ] || continue
-        migrate_if_requested "$line" && continue
         say '...'
         rewrite_self "$line"
     done
