@@ -3,23 +3,25 @@ SPACE=$(AGENT).d
 PID=$(SPACE)/pid
 IN=$(SPACE)/in
 OUT=$(SPACE)/out
+TEST_AGENT=/tmp/agent0-test.sh
+TEST_SPACE=$(TEST_AGENT).d
+TEST_PID=$(TEST_SPACE)/pid
+TEST_IN=$(TEST_SPACE)/in
+TEST_OUT=$(TEST_SPACE)/out
+TEST_OUTPUT=tests/output
 
-.PHONY: start connect status stop check clean
+.PHONY: start connect status stop check test clean
 
 start:
 	@cp agent0.sh $(AGENT)
 	@chmod +x $(AGENT)
+	@if test -f $(PID); then kill `cat $(PID)` 2>/dev/null || true; fi
+	@if test -f $(SPACE)/tail.pid; then kill `cat $(SPACE)/tail.pid` 2>/dev/null || true; fi
 	@rm -fr $(SPACE)
-	@mkdir -p $(SPACE)
-	@: > $(IN)
-	@: > $(OUT)
-	@if test -f $(PID) && kill -0 `cat $(PID)` 2>/dev/null; then \
-		printf '%s\n' "agent0 already running: `cat $(PID)`"; \
-	else \
-		nohup $(AGENT) > $(OUT) 2>&1 & echo $$! > $(PID); \
-		printf '%s\n' "agent0 started: `cat $(PID)`"; \
-		printf '%s\n' "connect with: make connect"; \
-	fi
+	@$(AGENT) >/tmp/agent0.boot 2>&1 & echo $$! > /tmp/agent0.pid
+	@printf '%s\n' "agent0 started: `cat /tmp/agent0.pid`"
+	@i=0; while test $$i -lt 20; do test -f $(IN) && break; i=`expr $$i + 1`; sleep 1; done
+	@$(MAKE) connect
 
 connect:
 	@test -f $(IN) || { printf '%s\n' 'agent0 terminal not ready; run make start'; exit 1; }
@@ -43,6 +45,43 @@ stop:
 check:
 	@sh -n agent0.sh
 
+test:
+	@sh -n agent0.sh
+	@test -f .env || { printf '%s\n' 'missing .env with OPENCODE_API_KEY=... or OPENAI_API_KEY=...'; exit 1; }
+	@key=`sed -n 's/^OPENCODE_API_KEY=//p; s/^OPENAI_API_KEY=//p' .env | sed -n '1p'`; \
+	test -n "$$key" || { printf '%s\n' 'missing OPENCODE_API_KEY or OPENAI_API_KEY in .env'; exit 1; }; \
+	if test -f $(TEST_PID); then kill `cat $(TEST_PID)` 2>/dev/null || true; fi; \
+	rm -fr $(TEST_SPACE) $(TEST_OUTPUT); \
+	mkdir -p $(TEST_OUTPUT); \
+	cp agent0.sh $(TEST_AGENT); \
+	chmod +x $(TEST_AGENT); \
+	$(TEST_AGENT) >/tmp/agent0-test.boot 2>&1 & echo $$! > /tmp/agent0-test.pid; \
+	i=0; while test $$i -lt 20; do test -f $(TEST_IN) && break; i=`expr $$i + 1`; sleep 1; done; \
+	test -f $(TEST_IN) || { printf '%s\n' 'test agent did not create terminal input'; exit 1; }; \
+	printf '%s\n' "$$key" >> $(TEST_IN); \
+	i=0; while test $$i -lt 20; do grep -q 'agent0 alive' $(TEST_OUT) 2>/dev/null && break; i=`expr $$i + 1`; sleep 1; done; \
+	for prompt in tests/prompts/*.txt; do \
+		test -f "$$prompt" || continue; \
+		name=`basename "$$prompt" .txt`; \
+		before=`wc -l < $(TEST_OUT) 2>/dev/null || printf 0`; \
+		cat "$$prompt" >> $(TEST_IN); \
+		printf '\n' >> $(TEST_IN); \
+		i=0; while test $$i -lt 180; do \
+			after=`wc -l < $(TEST_OUT) 2>/dev/null || printf 0`; \
+			test "$$after" -gt "$$before" && break; \
+			i=`expr $$i + 1`; sleep 1; \
+		done; \
+		cp $(TEST_OUT) "$(TEST_OUTPUT)/$$name.out"; \
+		printf '%s\n' "wrote $(TEST_OUTPUT)/$$name.out"; \
+		if grep -q 'OpenCode Go request failed\|curl:' "$(TEST_OUTPUT)/$$name.out"; then \
+			printf '%s\n' "test failed on $$prompt"; \
+			break; \
+		fi; \
+	done; \
+	if test -f $(TEST_PID); then kill `cat $(TEST_PID)` 2>/dev/null || true; fi
+
 clean:
 	@rm -f $(AGENT)
 	@rm -fr $(AGENT).d
+	@rm -f $(TEST_AGENT)
+	@rm -fr $(TEST_AGENT).d

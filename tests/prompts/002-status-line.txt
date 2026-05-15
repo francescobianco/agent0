@@ -1,0 +1,1 @@
+Add a short startup message saying that agent0 is ready.

@@ -1,36 +1,59 @@
 # agent0
 
-`agent0` e' un esperimento di agente automodificante in un singolo file `sh` POSIX.
+`agent0` is an experiment in a self-modifying autonomous agent contained in a single POSIX `sh` file.
 
-La copia nella repo e' ibernata. `make start` la copia in `/tmp/agent0.sh` e la avvia in background. Da Make usa `nohup /tmp/agent0.sh &` per non far morire il processo quando termina la shell del target; l'agente resta comunque un normale script lanciato in background.
+The repository copy is dormant. `make start` copies it to `/tmp/agent0.sh` and starts it with `/tmp/agent0.sh &`. The agent creates its own runtime space at `/tmp/agent0.sh.d` when it needs it.
 
-## Uso
+## Usage
 
 ```sh
 make start
 make connect
 ```
 
-Alla prima partenza, se non ha una chiave incorporata, entra in avvio latente: resta vivo in background e chiede la API key attraverso il terminale FIFO in `/tmp/agent0.sh.d/`. La chiave viene salvata dentro `/tmp/agent0.sh`, quindi l'agente vivo se la porta dietro quando migra.
+On first startup, if no key is embedded, the agent enters latent startup: it stays alive in the background and asks for the OpenCode Go token through its terminal file in `/tmp/agent0.sh.d/`. The key is saved inside `/tmp/agent0.sh`, so the live agent carries it with itself when it migrates.
 
-Per fermarlo:
+The agent uses OpenCode Go directly through the Chat Completions compatible API:
+
+```text
+endpoint: https://opencode.ai/zen/go/v1/chat/completions
+model:    deepseek-v4-flash
+```
+
+It does not use `OPENAI_API_KEY`, `OPENAI_BASE_URL`, or other environment variables. The token is embedded in the live agent copy.
+
+To stop it:
 
 ```sh
 make stop
 ```
 
-Per validare la copia ibernata:
+To validate the dormant copy:
 
 ```sh
 make check
 ```
 
-## Terminale
+To run the non-interactive prompt smoke tests, create `.env` with your OpenCode Go token:
 
-La connessione e' esterna all'agente:
+```sh
+OPENCODE_API_KEY=your-token
+```
+
+Then run:
+
+```sh
+make test
+```
+
+The test target starts a dedicated `/tmp/agent0-test.sh` instance, sends the prompts in `tests/prompts/`, and writes captured output under `tests/output/`.
+
+## Terminal
+
+Connection is external to the agent:
 
 ```sh
 make connect
 ```
 
-Non ci sono argomenti o sottocomandi CLI per `agent0.sh`: quando viene chiamato parte e basta.
+There are no CLI arguments or subcommands for `agent0.sh`: when called, it starts.

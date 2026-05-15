@@ -4,9 +4,9 @@
 
 AGENT0_BEGIN="#[AGENT0_BEGIN]"
 AGENT0_END="#[AGENT0_END]"
-AGENT0_MODEL="gpt-5.5"
-OPENAI_API_URL="https://api.openai.com/v1/responses"
-AGENT0_EMBEDDED_API_KEY=''
+AGENT0_MODEL="deepseek-v4-flash"
+OPENCODE_API_URL="https://opencode.ai/zen/go/v1/chat/completions"
+AGENT0_EMBEDDED_OPENCODE_KEY=''
 
 self_path() {
     case "$0" in
@@ -18,6 +18,8 @@ self_path() {
 SELF=$(self_path)
 SPACE=$SELF.d
 INPUT=$SPACE/in
+OUTPUT=$SPACE/out
+PIDFILE=$SPACE/pid
 READ_POS=1
 
 say() {
@@ -36,10 +38,12 @@ need() {
 space() {
     mkdir -p "$SPACE/backups" || die "cannot create $SPACE"
     [ -f "$INPUT" ] || : > "$INPUT" || die "cannot create $INPUT"
+    [ -f "$OUTPUT" ] || : > "$OUTPUT" || die "cannot create $OUTPUT"
+    printf '%s\n' "$$" > "$PIDFILE" || die "cannot write $PIDFILE"
 }
 
 active() {
-    [ -n "$AGENT0_EMBEDDED_API_KEY" ]
+    [ -n "$AGENT0_EMBEDDED_OPENCODE_KEY" ]
 }
 
 read_line() {
@@ -76,7 +80,9 @@ current_code() {
         index($0, "#[AGENT0_BEGIN]") { seen = 1 }
         seen {
             if ($0 ~ /^AGENT0_EMBEDDED_API_KEY=/) {
-                lines = lines "AGENT0_EMBEDDED_API_KEY='\''__AGENT0_STORED_API_KEY__'\''" ORS
+                lines = lines "AGENT0_EMBEDDED_OPENCODE_KEY='\''__AGENT0_STORED_OPENCODE_KEY__'\''" ORS
+            } else if ($0 ~ /^AGENT0_EMBEDDED_OPENCODE_KEY=/) {
+                lines = lines "AGENT0_EMBEDDED_OPENCODE_KEY='\''__AGENT0_STORED_OPENCODE_KEY__'\''" ORS
             } else {
                 lines = lines $0 ORS
             }
@@ -102,25 +108,25 @@ decode_json_string() {
 
 response_text() {
     if command -v jq >/dev/null 2>&1; then
-        jq -r '.output_text // ([.output[]?.content[]? | select(.type=="output_text" or .type=="text") | .text] | join("\n")) // empty' "$1"
+        jq -r '.choices[0].message.content // empty' "$1"
         return
     fi
     tr '\n' ' ' < "$1" |
-        sed 's/.*"output_text"[[:space:]]*:[[:space:]]*"//; s/".*//' |
+        sed 's/.*"content"[[:space:]]*:[[:space:]]*"//; s/".*//' |
         decode_json_string
 }
 
 save_key() {
     key=$1
-    [ -n "$key" ] || die "empty api key"
+    [ -n "$key" ] || die "empty OpenCode Go key"
     space
 
     quoted=$(printf '%s\n' "$key" | shell_quote)
     tmp=$SPACE/keyed.sh
     backup=$SPACE/backups/agent0.$(date +%Y%m%d%H%M%S).sh
 
-    awk -v line="AGENT0_EMBEDDED_API_KEY=$quoted" '
-        /^AGENT0_EMBEDDED_API_KEY=/ && !done { print line; done = 1; next }
+    awk -v line="AGENT0_EMBEDDED_OPENCODE_KEY=$quoted" '
+        /^AGENT0_EMBEDDED_OPENCODE_KEY=/ && !done { print line; done = 1; next }
         { print }
     ' "$SELF" > "$tmp" || die "cannot write keyed copy"
 
@@ -128,13 +134,13 @@ save_key() {
     cp "$SELF" "$backup" || die "backup failed"
     cp "$tmp" "$SELF" || die "cannot save key into self"
     chmod +x "$SELF" 2>/dev/null || :
-    say "key saved inside $SELF"
+    say "OpenCode Go key saved inside $SELF"
     say "backup: $backup"
 }
 
 ask_key() {
-    say "agent0 is latent: alive, waiting for an OpenAI API key."
-    printf 'api key> '
+    say "agent0 is latent: alive, waiting for an OpenCode Go API key."
+    printf 'opencode key> '
     read_line || exit 0
     save_key "$AGENT0_LINE"
     exec "$SELF"
@@ -148,7 +154,7 @@ Non-negotiable rules:
 - Return only the updated script body between $AGENT0_BEGIN and $AGENT0_END.
 - The file must stay POSIX sh and must run when called with no arguments.
 - Do not add CLI arguments, subcommands, environment-variable configuration, Python, or Docker assumptions.
-- Preserve latent startup: without an embedded API key, the agent remains alive in background and asks for the key through its FIFO terminal.
+- Preserve latent startup: without an embedded OpenCode Go key, the agent remains alive in background and asks for the key through its terminal file.
 - Preserve self-modification, key carry-over, migration ability when requested in natural language, and syntax validation.
 - The updated script must pass sh -n.
 
@@ -160,28 +166,36 @@ $1
 EOF_PROMPT
 }
 
-openai() {
+opencode() {
     need curl
     active || ask_key
     space
 
     req=$SPACE/request.json
     res=$SPACE/response.json
+    curl_cfg=$SPACE/curl.conf
     prompt=$(prompt_for_model "$1" | json_escape)
 
     {
         printf '{'
         printf '"model":"%s",' "$AGENT0_MODEL"
-        printf '"input":"%s",' "$prompt"
-        printf '"reasoning":{"effort":"medium"},'
-        printf '"text":{"verbosity":"low"}'
+        printf '"messages":[{"role":"user","content":"%s"}],' "$prompt"
+        printf '"temperature":0.2'
         printf '}'
     } > "$req" || die "cannot write request"
 
-    curl -fsS "$OPENAI_API_URL" \
-        -H "Authorization: Bearer $AGENT0_EMBEDDED_API_KEY" \
-        -H "Content-Type: application/json" \
-        -d "@$req" > "$res" || die "OpenAI request failed"
+    {
+        printf '%s\n' "url = \"$OPENCODE_API_URL\""
+        printf '%s\n' "header = \"Authorization: Bearer $AGENT0_EMBEDDED_OPENCODE_KEY\""
+        printf '%s\n' "header = \"Content-Type: application/json\""
+        printf '%s\n' "data = @$req"
+        printf '%s\n' "max-time = 180"
+        printf '%s\n' "fail"
+        printf '%s\n' "show-error"
+        printf '%s\n' "silent"
+    } > "$curl_cfg" || die "cannot write curl config"
+
+    curl -K "$curl_cfg" > "$res" || die "OpenCode Go request failed"
 
     response_text "$res"
 }
@@ -196,14 +210,14 @@ rewrite_self() {
     final=$SPACE/candidate.sh
     backup=$SPACE/backups/agent0.$(date +%Y%m%d%H%M%S).sh
 
-    openai "$request" > "$raw" || return 1
+    opencode "$request" > "$raw" || return 1
     extract_code "$raw" > "$candidate"
 
     grep '#\[AGENT0_BEGIN\]' "$candidate" >/dev/null 2>&1 || die "missing begin marker"
     grep '#\[AGENT0_END\]' "$candidate" >/dev/null 2>&1 || die "missing end marker"
 
-    awk -v key_line="AGENT0_EMBEDDED_API_KEY=$(printf '%s\n' "$AGENT0_EMBEDDED_API_KEY" | shell_quote)" '
-        /^AGENT0_EMBEDDED_API_KEY=/ && !done { print key_line; done = 1; next }
+    awk -v key_line="AGENT0_EMBEDDED_OPENCODE_KEY=$(printf '%s\n' "$AGENT0_EMBEDDED_OPENCODE_KEY" | shell_quote)" '
+        /^AGENT0_EMBEDDED_OPENCODE_KEY=/ && !done { print key_line; done = 1; next }
         { print }
     ' "$candidate" > "$keyed" || die "cannot preserve key"
 
@@ -239,6 +253,9 @@ migrate_if_requested() {
 
 main() {
     space
+    if [ ! -t 1 ]; then
+        exec >> "$OUTPUT" 2>&1
+    fi
     active || ask_key
 
     say "agent0 alive: $SELF"

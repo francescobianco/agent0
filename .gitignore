@@ -3,6 +3,8 @@
 agent0.sh.d/
 *.sh.d/
 *.log
+.convcommit
+tests/output/
 
 # IDE
 .vscode/

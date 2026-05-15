@@ -1,0 +1,1 @@
+Add a compact startup note reminding the user that each request may rewrite this file.
