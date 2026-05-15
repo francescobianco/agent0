@@ -1,6 +1,6 @@
 #!/bin/sh
 #[AGENT0_BEGIN]
-# agent0: single-file POSIX sh self-modifying agent
+# agent0: single-file POSIX sh self-modifying agent (FIFO IPC)
 
 AGENT0_BEGIN="#[AGENT0_BEGIN]"
 AGENT0_END="#[AGENT0_END]"
@@ -17,48 +17,27 @@ self_path() {
 
 SELF=$(self_path)
 SPACE=$SELF.d
-INPUT=$SPACE/in
-OUTPUT=$SPACE/out
+IN_FIFO=$SPACE/in
+OUT_FIFO=$SPACE/out
 PIDFILE=$SPACE/pid
-READ_POS=1
 
-say() {
-    printf '%s\n' "$*"
-}
+need() { command -v "$1" >/dev/null 2>&1 || die "missing command: $1"; }
+say() { printf '%s\n' "$*"; }
+die() { say "agent0: $*" >&2; exit 1; }
 
-die() {
-    say "agent0: $*" >&2
-    exit 1
-}
-
-need() {
-    command -v "$1" >/dev/null 2>&1 || die "missing command: $1"
-}
-
-space() {
+setup() {
     mkdir -p "$SPACE/backups" || die "cannot create $SPACE"
-    [ -f "$INPUT" ] || : > "$INPUT" || die "cannot create $INPUT"
-    [ -f "$OUTPUT" ] || : > "$OUTPUT" || die "cannot create $OUTPUT"
+    [ -p "$IN_FIFO" ] || mkfifo "$IN_FIFO" || die "cannot create $IN_FIFO"
+    [ -p "$OUT_FIFO" ] || mkfifo "$OUT_FIFO" || die "cannot create $OUT_FIFO"
+    exec 3<>"$IN_FIFO"
+    exec 4<>"$OUT_FIFO"
     printf '%s\n' "$$" > "$PIDFILE" || die "cannot write $PIDFILE"
 }
 
-active() {
-    [ -n "$AGENT0_EMBEDDED_OPENCODE_KEY" ]
-}
+active() { [ -n "$AGENT0_EMBEDDED_OPENCODE_KEY" ]; }
 
 read_line() {
-    while :; do
-        total=$(wc -l < "$INPUT" | tr -d ' ')
-        case "$total" in
-            ''|*[!0-9]*) total=0 ;;
-        esac
-        if [ "$total" -ge "$READ_POS" ]; then
-            AGENT0_LINE=$(sed -n "${READ_POS}p" "$INPUT")
-            READ_POS=$((READ_POS + 1))
-            return 0
-        fi
-        sleep 1
-    done
+    IFS= read -r AGENT0_LINE <&3 || exit 0
 }
 
 json_escape() {
@@ -119,7 +98,6 @@ response_text() {
 save_key() {
     key=$1
     [ -n "$key" ] || die "empty OpenCode Go key"
-    space
 
     quoted=$(printf '%s\n' "$key" | shell_quote)
     tmp=$SPACE/keyed.sh
@@ -140,7 +118,7 @@ save_key() {
 
 ask_key() {
     say "agent0 is latent: alive, waiting for an OpenCode Go API key."
-    printf 'opencode key> '
+    say 'opencode key> '
     read_line || exit 0
     save_key "$AGENT0_LINE"
     exec "$SELF"
@@ -169,7 +147,6 @@ EOF_PROMPT
 opencode() {
     need curl
     active || ask_key
-    space
 
     req=$SPACE/request.json
     res=$SPACE/response.json
@@ -202,7 +179,6 @@ opencode() {
 
 rewrite_self() {
     request=$1
-    space
 
     raw=$SPACE/model-output.txt
     candidate=$SPACE/candidate.body
@@ -213,8 +189,15 @@ rewrite_self() {
     opencode "$request" > "$raw" || return 1
     extract_code "$raw" > "$candidate"
 
-    grep '#\[AGENT0_BEGIN\]' "$candidate" >/dev/null 2>&1 || die "missing begin marker"
-    grep '#\[AGENT0_END\]' "$candidate" >/dev/null 2>&1 || die "missing end marker"
+    if ! grep '#\[AGENT0_BEGIN\]' "$candidate" >/dev/null 2>&1; then
+        cat "$raw"
+        return 0
+    fi
+
+    grep '#\[AGENT0_END\]' "$candidate" >/dev/null 2>&1 || {
+        cat "$raw"
+        return 0
+    }
 
     awk -v key_line="AGENT0_EMBEDDED_OPENCODE_KEY=$(printf '%s\n' "$AGENT0_EMBEDDED_OPENCODE_KEY" | shell_quote)" '
         /^AGENT0_EMBEDDED_OPENCODE_KEY=/ && !done { print key_line; done = 1; next }
@@ -252,18 +235,15 @@ migrate_if_requested() {
 }
 
 main() {
-    space
-    if [ ! -t 1 ]; then
-        exec >> "$OUTPUT" 2>&1
-    fi
+    setup
+    exec >&4 2>&1
     active || ask_key
 
     say "agent0 alive: $SELF"
-    say "terminal input: $INPUT"
-    say "write a request into the terminal; the agent stays alive in background."
+    say "write a message; the agent stays alive in background."
 
     while :; do
-        printf 'agent0> '
+        say 'agent0> '
         read_line || exit 0
         line=$AGENT0_LINE
         [ -n "$line" ] || continue
