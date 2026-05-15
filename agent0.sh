@@ -131,8 +131,9 @@ Non-negotiable rules:
 - The file must stay POSIX sh and must run when called with no arguments.
 - Do not add CLI arguments, subcommands, environment-variable configuration, Python, or Docker assumptions.
 - Preserve latent startup: without an embedded OpenCode Go key, the agent remains alive in background and asks for the key through its terminal file.
-- Preserve self-modification, key carry-over, migration ability when requested in natural language, and syntax validation.
+- Preserve self-modification, key carry-over when requested in natural language, and syntax validation.
 - The updated script must pass sh -n.
+- If the user request is a conversational question, embed the answer in the code by adding a say command inside main(), before the while loop.
 
 Current script:
 $(current_code)
@@ -185,6 +186,15 @@ rewrite_self() {
     backup=$SPACE/backups/agent0.$(date +%Y%m%d%H%M%S).sh
 
     opencode "$request" > "$raw" || return 1
+
+    # Show first two lines of model's response as feedback (before rewrite)
+    head -n 2 "$raw" | while IFS= read -r line; do
+      case "$line" in
+        '#[AGENT0_BEGIN]'|'#[AGENT0_END]'|'') continue ;;
+        *) say "> $line" ;;
+      esac
+    done
+
     extract_code "$raw" > "$candidate"
 
     if ! grep '#\[AGENT0_BEGIN\]' "$candidate" >/dev/null 2>&1; then
