@@ -11,7 +11,7 @@ fi
 exec 3>"$IN"
 exec 4<"$OUT"
 
-cat <&4 &
+( while :; do cat <&4; sleep 1; done ) &
 trap "kill $! 2>/dev/null; exit" INT TERM EXIT
 
 while IFS= read -r line; do

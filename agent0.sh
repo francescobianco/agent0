@@ -29,8 +29,6 @@ setup() {
     mkdir -p "$SPACE/backups" || die "cannot create $SPACE"
     [ -p "$IN_FIFO" ] || mkfifo "$IN_FIFO" || die "cannot create $IN_FIFO"
     [ -p "$OUT_FIFO" ] || mkfifo "$OUT_FIFO" || die "cannot create $OUT_FIFO"
-    exec 3<>"$IN_FIFO"
-    exec 4<>"$OUT_FIFO"
     printf '%s\n' "$$" > "$PIDFILE" || die "cannot write $PIDFILE"
 }
 
@@ -236,6 +234,8 @@ migrate_if_requested() {
 
 main() {
     setup
+    exec 3<>"$IN_FIFO" 2>/dev/null
+    exec 4<>"$OUT_FIFO" 2>/dev/null
     exec >&4 2>&1
     active || ask_key
 
