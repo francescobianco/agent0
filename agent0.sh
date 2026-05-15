@@ -21,9 +21,9 @@ IN_FIFO=$SPACE/in
 OUT_FIFO=$SPACE/out
 PIDFILE=$SPACE/pid
 
-need() { command -v "$1" >/dev/null 2>&1 || die "missing command: $1"; }
 say() { printf '%s\n' "$*"; }
 die() { say "agent0: $*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || die "missing command: $1"; }
 
 setup() {
     mkdir -p "$SPACE/backups" || die "cannot create $SPACE"
@@ -116,7 +116,7 @@ save_key() {
 
 ask_key() {
     say "agent0 is latent: alive, waiting for an OpenCode Go API key."
-    say 'opencode key> '
+    printf 'opencode key> '
     read_line || exit 0
     save_key "$AGENT0_LINE"
     exec "$SELF"
@@ -186,15 +186,6 @@ rewrite_self() {
     backup=$SPACE/backups/agent0.$(date +%Y%m%d%H%M%S).sh
 
     opencode "$request" > "$raw" || return 1
-
-    # Show first two lines of model's response as feedback (before rewrite)
-    head -n 2 "$raw" | while IFS= read -r line; do
-      case "$line" in
-        '#[AGENT0_BEGIN]'|'#[AGENT0_END]'|'') continue ;;
-        *) say "> $line" ;;
-      esac
-    done
-
     extract_code "$raw" > "$candidate"
 
     if ! grep '#\[AGENT0_BEGIN\]' "$candidate" >/dev/null 2>&1; then
@@ -237,7 +228,7 @@ main() {
     say "write a message; the agent stays alive in background."
 
     while :; do
-        say 'agent0> '
+        printf 'agent0> '
         read_line || exit 0
         line=$AGENT0_LINE
         [ -n "$line" ] || continue
